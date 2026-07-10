@@ -372,6 +372,9 @@ Then continue with Steps 5–8.
   cloned, moved, or deleted — only read
 - **Output location** — files go to the user's chosen directory (Step 2), not a hidden `outputs/` folder
 - **Script path** — always reference as `.github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py`
+- **Self-exclusion** — when analyzing a local project, `.github/skills/*` (where this and any
+  other Copilot agent skill live) is always pruned from the walk. "Reverse engineer this
+  project" analyzes the host project only, never the skill's own bundled scripts.
 - **ASPX support** — `.aspx` and `.aspx.cs` are Web Forms screens; detected automatically
 - **File cap** — up to 300 files, layer-balanced (controllers → services → repos → domain → models)
 - **Auth detection** — RBAC, ABAC, ReBAC patterns across C# / Java / Python / JS / TS

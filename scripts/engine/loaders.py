@@ -36,6 +36,22 @@ This prevents reading generated artifacts, dependency caches, IDE files,
 and compiled output that would pollute the analysis.
 """
 
+SKIP_PATH_PREFIXES = {
+    os.path.normpath(os.path.join(".github", "skills")),
+}
+"""set[str]: Directory paths (relative to the analysis root, OS-normalised)
+that are pruned entirely, regardless of what they're named.
+
+This is deliberately path-based rather than name-based: ``SKIP_DIRS``
+matches by directory *name* anywhere in the tree, which is too broad for
+this case (a project can legitimately have its own ``skills/`` folder).
+``.github/skills`` is where GitHub Copilot agent skills — including this
+very skill — get installed. When a user runs "reverse engineer this
+project" / "analyze this codebase" against their own project root, the
+skill's own bundled scripts must never be walked in as if they were the
+project's business logic.
+"""
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -70,6 +86,17 @@ def load_repo(repo_path, extensions=None):
 
     files_data = []
     for root, dirs, files in os.walk(repo_path):
+        rel_root = os.path.normpath(os.path.relpath(root, repo_path))
+
+        # Prune installed-skill directories (e.g. .github/skills/*) entirely —
+        # never treat the reverse-engineering skill's own code as project code.
+        if any(
+            rel_root == prefix or rel_root.startswith(prefix + os.sep)
+            for prefix in SKIP_PATH_PREFIXES
+        ):
+            dirs[:] = []
+            continue
+
         # Prune the directory list in-place to avoid descending into skipped dirs.
         dirs[:] = [
             d for d in dirs
