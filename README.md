@@ -14,6 +14,10 @@ already sitting on your local disk**, and produces a focused 4-section report:
 
 No API key required. GitHub Copilot is the AI engine.
 
+Output is a single self-contained Markdown report — no SVG diagrams or HTML dashboard (for
+now). The dependency graph renders as a Mermaid flowchart directly inside the report, so it
+displays natively on GitHub, GitLab, and VS Code preview with no extra files to open.
+
 ---
 
 ## Requirements
@@ -93,14 +97,14 @@ By default, output is written to `./{repo-name}/` inside your current working di
 ```
 your-project/
 └── nopCommerce/           ← created automatically
-    ├── nopCommerce_report.md      ← 4-section focused report  ← open this first
+    ├── nopCommerce_report.md      ← 4-section focused report (business logic, screens,
+    │                                 dependency graph as Mermaid)  ← open this first
     ├── nopCommerce_sdd.json       ← full system design doc (JSON)
-    ├── nopCommerce_dashboard.html ← interactive HTML dashboard
-    ├── nopCommerce_block_diagram.svg
-    ├── nopCommerce_dependency_graph.svg
     ├── nopCommerce_evaluation.md
     └── manifest.json
 ```
+
+No SVG diagrams or HTML dashboard are written (for now).
 
 You can also say:
 - **"save in current folder"** → files land next to your project files
@@ -108,7 +112,7 @@ You can also say:
 
 **Analyzing a local project?** If you're already sitting inside the folder you want analyzed,
 the default (option 1) creates the output subfolder nested inside that same project — harmless
-(the generated `.md`/`.json`/`.html`/`.svg` files aren't picked up as source code on a re-run),
+(the generated `.md`/`.json` files aren't picked up as source code on a re-run),
 but if you'd rather keep outputs separate, say **"save to ../my-project-analysis"**.
 
 ---

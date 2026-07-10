@@ -83,7 +83,7 @@ If the user does not answer or presses Enter, default to **option 1**.
 **Local-folder special case:** if the target being analyzed *is* the current directory (e.g.
 the user said "analyze this project" while sitting in it), option 1 would create the output
 subfolder nested inside the very project being analyzed. That's harmless (generated `.md` /
-`.json` / `.html` / `.svg` files aren't source code, so a re-run won't re-analyze them) but can
+`.json` files aren't source code, so a re-run won't re-analyze them) but can
 be confusing — mention this and suggest option 3 with a sibling path (e.g. `../{project}-analysis`)
 if the user wants a cleaner separation.
 
@@ -142,13 +142,12 @@ Wait for completion. Output files produced:
 
 | File | Description |
 |------|-------------|
-| `{repo}_report.md` | **4-section focused report** — primary artifact |
+| `{repo}_report.md` | **4-section focused report** — primary artifact: business-logic view, screen-by-screen navigation, and code dependency graph (Mermaid, in-file — no SVG/HTML) |
 | `{repo}_sdd.json` | Full System Design Document (JSON) |
-| `{repo}_dashboard.html` | Self-contained interactive dashboard |
-| `{repo}_block_diagram.svg` | Architecture layers diagram |
-| `{repo}_dependency_graph.svg` | Module dependency graph |
 | `{repo}_evaluation.md` | 100-point quality score |
 | `manifest.json` | Run metrics |
+
+**No SVG diagrams or HTML dashboard are generated (for now)** — everything lives in the Markdown report as text and Mermaid diagrams so it renders anywhere (GitHub, GitLab, VS Code preview) with no extra file dependencies.
 
 **If the script is not found**, go to [Manual Fallback](#manual-fallback-script-not-found) at the bottom.
 
@@ -334,10 +333,8 @@ Stats:
 
 Other output files in {output_dir}:
   {repo}_sdd.json            — Full System Design Document
-  {repo}_dashboard.html      — Interactive stakeholder dashboard
-  {repo}_block_diagram.svg   — Architecture diagram
-  {repo}_dependency_graph.svg
-  {repo}_evaluation.md
+  {repo}_evaluation.md       — 100-point quality score
+  manifest.json              — Run metrics
   manifest.json
 ```
 

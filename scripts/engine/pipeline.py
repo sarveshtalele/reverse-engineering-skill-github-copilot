@@ -17,8 +17,10 @@ Pipeline stages:
 5. **Heuristics** — generate executive summary, modernisation roadmap, and
    business logic analysis with :mod:`engine.ai_analysis` using pure static
    heuristics (no API calls).
-6. **Generate** — build SDD JSON, HTML dashboard, and Markdown report with
-   :mod:`engine.generators`.
+6. **Generate** — build SDD JSON and Markdown report with
+   :mod:`engine.generators`. No SVG or HTML dashboard is produced — the
+   Markdown report carries the business-logic view, screen-by-screen
+   navigation, and code dependency graph (as text/Mermaid) directly.
 7. **Write**   — persist all outputs via :class:`~engine.output_manager.OutputManager`
    and emit a ``manifest.json`` with run metrics.
 8. **Cleanup** — remove the temporary clone directory.
@@ -41,15 +43,11 @@ from engine.analyzer    import (
     generate_openapi_spec,
     detect_dead_code,
     detect_tech_stack,
-    detect_platform,
-    detect_architecture_layers,
     find_top_modules,
     detect_database_schema,
     suggest_microservice_data_boundaries,
     generate_block_diagram,
     generate_block_diagram_dot,
-    generate_block_diagram_svg,
-    generate_dep_graph_svg,
     detect_auth_patterns,
     detect_screens_navigation,
 )
@@ -60,7 +58,6 @@ from engine.ai_analysis import (
     ai_all_sections_claude,
 )
 from engine.generators.sdd       import generate_sdd
-from engine.generators.dashboard import generate_html_dashboard
 from engine.generators.report    import generate_md_report
 from engine.output_manager       import OutputManager
 from engine.evaluator            import evaluate_pipeline_output, write_evaluation_md
@@ -154,9 +151,10 @@ def run_pipeline(repo_url, mode="heuristic", output_dir=None):
     *repo_url* may be either a remote git/GitHub URL (which is shallow-cloned
     to a temp directory) or a path to a project that already exists on the
     local filesystem (which is analysed in place, no clone, no cleanup of
-    user files). Either way this analyses the source code, generates five
-    output files (SDD JSON, HTML dashboard, Markdown report, quality
-    evaluation, manifest), and prints a concise progress summary to stdout.
+    user files). Either way this analyses the source code and generates four
+    output files: SDD JSON, Markdown report (business-logic view,
+    screen-by-screen navigation, code dependency graph), quality evaluation,
+    and manifest. No SVG diagrams or HTML dashboard are generated.
 
     Args:
         repo_url (str): GitHub repository URL, or a path to an existing
@@ -324,8 +322,6 @@ def run_pipeline(repo_url, mode="heuristic", output_dir=None):
                 parsed, endpoints, db_schema, report, repo_name
             )
 
-        platform_str    = detect_platform(parsed)
-        arch_layers     = detect_architecture_layers(parsed)
         data_boundaries = suggest_microservice_data_boundaries(db_schema, modernization)
         auth_analysis   = detect_auth_patterns(parsed)
         screens_nav     = detect_screens_navigation(parsed, endpoints)
@@ -364,22 +360,8 @@ def run_pipeline(repo_url, mode="heuristic", output_dir=None):
         sdd_path = om.write_json(f"{repo_name}_sdd.json", sdd_data)
         print(f"      [ok] SDD JSON -> {sdd_path}")
 
-        # File 2: HTML Dashboard
-        html_content = generate_html_dashboard(
-            repo_name, repo_url, report, endpoints, dead_code,
-            tech_stack, summary, modernization, top_mods,
-            platform=platform_str,
-            arch_layers=arch_layers,
-            db_schema=db_schema,
-            data_boundaries=data_boundaries,
-            business_logic=business_logic,
-            block_diagram=block_diagram_data,
-            dep_graph=dep_graph,
-        )
-        html_path = om.write_text(f"{repo_name}_dashboard.html", html_content)
-        print(f"      [ok] HTML Dashboard -> {html_path}")
-
-        # File 3: Markdown Report
+        # File 2: Markdown Report — business-logic view, screen-by-screen
+        # navigation, and code dependency graph (Mermaid, no SVG/HTML).
         md_content = generate_md_report(
             repo_name, repo_url, report, parsed, dep_map, endpoints,
             openapi_spec, dead_code, tech_stack, summary,
@@ -390,19 +372,10 @@ def run_pipeline(repo_url, mode="heuristic", output_dir=None):
             block_diagram=block_diagram_data,
             auth_analysis=auth_analysis,
             screens_nav=screens_nav,
+            dep_graph=dep_graph,
         )
         md_path = om.write_text(f"{repo_name}_report.md", md_content)
         print(f"      [ok] MD Report -> {md_path}")
-
-        # File 4: Block Diagram SVG
-        svg_content = generate_block_diagram_svg(block_diagram_data)
-        svg_path = om.write_text(f"{repo_name}_block_diagram.svg", svg_content)
-        print(f"      [ok] Block Diagram SVG -> {svg_path}")
-
-        # File 5: Dependency Graph SVG
-        dep_svg_content = generate_dep_graph_svg(dep_graph)
-        dep_svg_path = om.write_text(f"{repo_name}_dependency_graph.svg", dep_svg_content)
-        print(f"      [ok] Dependency Graph SVG -> {dep_svg_path}")
 
         # Manifest
         primary_lang = (
@@ -454,7 +427,7 @@ def run_pipeline(repo_url, mode="heuristic", output_dir=None):
         print(f"\n  Output files:")
         for line in om.summary_lines():
             print(line)
-        print(f"\n  Open the .md report or .html dashboard for full analysis details.")
+        print(f"\n  Open the .md report for the business-logic view, screen-by-screen navigation, and code dependency graph.")
         print(f"{'='*60}\n")
 
     finally:

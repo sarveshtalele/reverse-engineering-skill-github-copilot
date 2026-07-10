@@ -79,6 +79,56 @@ def render_ascii_block_diagram(block_diagram_data):
     return "\n".join(lines)
 
 
+def render_mermaid_dependency_graph(dep_graph, max_edges=60):
+    """Render a code dependency graph as a Mermaid ``flowchart`` block.
+
+    Replaces the old SVG dependency graph — same data, plain text output
+    that renders inline in any GFM-compatible Markdown viewer.
+
+    Args:
+        dep_graph (dict | None): ``{"nodes": [{"id","label",...}], "edges": [{"from","to"}]}``
+            as produced by :func:`engine.analyzer.generate_dep_graph_data`.
+        max_edges (int): Cap on rendered edges to keep the diagram readable.
+            Defaults to ``60``.
+
+    Returns:
+        tuple[str, str]: ``(mermaid_block, text_edge_list)`` — the fenced
+        Mermaid diagram and a plain-text fallback edge list.
+    """
+    if not dep_graph or not dep_graph.get("edges"):
+        return "_No module dependency edges detected._", "_No data._"
+
+    nodes = {n["id"]: n.get("label", n["id"]) for n in dep_graph.get("nodes", [])}
+    edges = dep_graph.get("edges", [])[:max_edges]
+
+    def _mid(node_id):
+        """Sanitise a node id into a safe Mermaid identifier."""
+        return "n" + "".join(c if c.isalnum() else "_" for c in str(node_id))
+
+    lines = ["```mermaid", "flowchart LR"]
+    seen_nodes = set()
+    for e in edges:
+        src, dst = e.get("from"), e.get("to")
+        if src is None or dst is None:
+            continue
+        for node_id in (src, dst):
+            if node_id not in seen_nodes:
+                label = nodes.get(node_id, str(node_id)).replace('"', "'")
+                lines.append(f'    {_mid(node_id)}["{label}"]')
+                seen_nodes.add(node_id)
+        lines.append(f"    {_mid(src)} --> {_mid(dst)}")
+    lines.append("```")
+    mermaid_block = "\n".join(lines)
+
+    text_edges = "\n".join(
+        f"- `{nodes.get(e.get('from'), e.get('from'))}` → `{nodes.get(e.get('to'), e.get('to'))}`"
+        for e in edges
+        if e.get("from") is not None and e.get("to") is not None
+    ) or "_No data._"
+
+    return mermaid_block, text_edges
+
+
 def generate_md_report(
     repo_name,
     repo_url,
@@ -98,6 +148,7 @@ def generate_md_report(
     block_diagram=None,
     auth_analysis=None,
     screens_nav=None,
+    dep_graph=None,
 ):
     """Build the focused 4-section Markdown report.
 
@@ -136,6 +187,7 @@ def generate_md_report(
     ) or "- _No distinct layers detected_"
 
     ascii_diagram = render_ascii_block_diagram(block_diagram) if isinstance(block_diagram, dict) else "No visual diagram available."
+    dep_mermaid, dep_text_edges = render_mermaid_dependency_graph(dep_graph)
 
     # Dependency top modules
     top_deps_md = "\n".join(
@@ -404,19 +456,19 @@ def generate_md_report(
 
 ### System Block Diagram
 
-![System Architecture Block Diagram]({repo_name}_block_diagram.svg)
-
-<details>
-<summary><b>Show ASCII Block Diagram (Offline / Plain-Text View)</b></summary>
-
 ```text
 {ascii_diagram}
 ```
+
+### Module Dependency Graph (Code Dependency)
+
+{dep_mermaid}
+
+<details>
+<summary><b>Show Dependency Edge List (Plain-Text View)</b></summary>
+
+{dep_text_edges}
 </details>
-
-### Module Dependency Graph
-
-![Module Dependency Graph]({repo_name}_dependency_graph.svg)
 
 ---
 

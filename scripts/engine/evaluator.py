@@ -294,7 +294,8 @@ def write_evaluation_md(evaluation: dict) -> str:
 - Cross-reference entity names against actual ORM model files in the repository
 
 ### Dependency Graph
-- The Mermaid diagram in the HTML dashboard shows module-to-module edges
+- The Mermaid diagram in the Markdown report's "Module Dependency Graph"
+  section shows module-to-module edges
 - Verify a known dependency exists as an edge in the graph
 
 ---

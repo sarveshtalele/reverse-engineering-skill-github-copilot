@@ -23,8 +23,8 @@ engine/pipeline.py  run_pipeline(repo_url, mode, output_dir)
   [7] detect_screens_nav()   — analyzer.py — UI screen inventory
   [8] ai_*() functions       — ai_analysis.py — heuristic domain analysis
   [9] generate_sdd()         — generators/sdd.py
-      generate_html_dashboard()  — generators/dashboard.py
-      generate_md_report()   — generators/report.py
+      generate_md_report()   — generators/report.py (business logic, screens,
+                                Mermaid dependency graph — no SVG/HTML)
  [10] OutputManager          — output_manager.py — writes files
  [11] evaluate_pipeline_output — evaluator.py — quality score
 ```
@@ -115,13 +115,14 @@ Code grants access based on the **relationship** between the user and the resour
 
 | File | Contents | Primary Consumer |
 |------|---------|-----------------|
-| `{repo}_report.md` | 4-section focused report (System Design, Auth, Business Logic, Screens) | Human stakeholders, Copilot AI narrative |
+| `{repo}_report.md` | 4-section focused report (System Design incl. ASCII block diagram + Mermaid dependency graph, Auth, Business Logic, Screens) | Human stakeholders, Copilot AI narrative |
 | `{repo}_sdd.json` | Full JSON SDD — 16 sections including `auth_analysis`, `screens_navigation` | AI assistants, tooling |
-| `{repo}_dashboard.html` | Self-contained HTML — no server, share by email | Non-technical stakeholders |
-| `{repo}_block_diagram.svg` | Architecture layers SVG | Presentations, docs |
-| `{repo}_dependency_graph.svg` | Module dependency graph SVG | Code review, refactoring |
 | `{repo}_evaluation.md` | 100-point quality score with confidence band | QA, architects |
 | `manifest.json` | Run metrics: files, classes, endpoints, timestamps | CI, tooling |
+
+No SVG diagrams or HTML dashboard are generated (for now) — `generate_html_dashboard()`,
+`generate_block_diagram_svg()`, and `generate_dep_graph_svg()` still exist in
+`engine/generators/dashboard.py` / `engine/analyzer.py` but `pipeline.py` no longer calls them.
 
 ---
 
