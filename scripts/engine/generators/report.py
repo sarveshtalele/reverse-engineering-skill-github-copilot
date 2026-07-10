@@ -334,10 +334,16 @@ def generate_md_report(
     # ------------------------------------------------------------------
     # Assemble report
     # ------------------------------------------------------------------
+    _is_web_url = repo_url.startswith(("http://", "https://"))
+    _source_line = (
+        f"> Repository: [{repo_url}]({repo_url})"
+        if _is_web_url
+        else f"> Source: `{repo_url}` (local project)"
+    )
     report_md = f"""# {repo_name} — Reverse Engineering Report
 
 > **Auto-generated** by the Reverse Engineer Skill · {now}
-> Repository: [{repo_url}]({repo_url})
+{_source_line}
 > Primary Language: **{primary.capitalize()}**  |  Project Type: **{project_type}**
 > Analysis Engine: **Pure static heuristics — no API keys required**
 

@@ -12,7 +12,9 @@ reverse_engineer_skill.py  (CLI entry point)
         ↓
 engine/pipeline.py  run_pipeline(repo_url, mode, output_dir)
         ↓
-  [1] clone_repo()           — git clone --depth=1
+  [1] is_git_url() branch:
+        remote → clone_repo()  — git clone --depth=1 to a temp dir (deleted after run)
+        local  → os.path.isdir() check — analyzed in place, nothing cloned/deleted
   [2] load_repo()            — loaders.py  — walks source tree
   [3] parse_file()           — parsers.py  — per-language AST extraction
   [4] generate_report()      — analyzer.py — codebase metrics
@@ -180,5 +182,8 @@ sys.path.insert(0, _SCRIPT_DIR)
 
 This means you can invoke it from any working directory as:
 ```bash
-python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py <url>
+python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py <url-or-local-path>
 ```
+
+`<url-or-local-path>` accepts either a remote git URL or an existing local directory —
+see `engine/pipeline.py`'s `is_git_url()` / `repo_name_from_path()` for the detection logic.

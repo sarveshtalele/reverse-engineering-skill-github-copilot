@@ -1,21 +1,25 @@
 ---
 name: reverse-engineering-skill
 description: >
-  Reverse engineer any GitHub repository — produces a complete 4-section analysis:
-  (1) System Design Overview (full architecture, codebase metrics, API catalog, data model,
-  dependency graph, modernization roadmap), (2) Authentication & Access Control (detects
-  RBAC role-based, ABAC attribute/policy-based, and ReBAC relationship-based patterns with
-  named roles, policies, and route protection map), (3) Business Logic Extractor (business
-  domain, core workflows end-to-end, user roles, key business rules, entity glossary,
-  external integrations), (4) Screen-by-Screen Navigation (complete UI screen inventory,
-  Mermaid navigation flowchart, end-to-end user journey for web apps including ASP.NET Web
-  Forms .aspx pages, MVC Razor views, React/Vue/Angular SPAs, JSP pages).
-  Trigger this skill when the user says: reverse engineer, analyze this repo, what does
-  this codebase do, explain the system design, document the architecture, extract business
-  logic, show me how this web app navigates, what auth does this project use, screen flow,
-  or provides any github.com URL with intent to understand or document it.
+  Reverse engineer any GitHub repository OR any project already sitting in a local folder —
+  produces a complete 4-section analysis: (1) System Design Overview (full architecture,
+  codebase metrics, API catalog, data model, dependency graph, modernization roadmap),
+  (2) Authentication & Access Control (detects RBAC role-based, ABAC attribute/policy-based,
+  and ReBAC relationship-based patterns with named roles, policies, and route protection map),
+  (3) Business Logic Extractor (business domain, core workflows end-to-end, user roles, key
+  business rules, entity glossary, external integrations), (4) Screen-by-Screen Navigation
+  (complete UI screen inventory, Mermaid navigation flowchart, end-to-end user journey for web
+  apps including ASP.NET Web Forms .aspx pages, MVC Razor views, React/Vue/Angular SPAs, JSP
+  pages).
+  Trigger this skill when the user says: reverse engineer, analyze this repo, analyze this
+  codebase, analyze this project/folder, what does this codebase do, explain the system
+  design, document the architecture, extract business logic, show me how this web app
+  navigates, what auth does this project use, screen flow — OR provides any github.com URL,
+  OR provides/implies a local folder path (e.g. "reverse engineer this project", "analyze the
+  code in this repo", "document the folder I'm in", "reverse engineer C:\Projects\LegacyApp")
+  with intent to understand or document it.
   No Anthropic API key required — GitHub Copilot is the AI engine.
-version: "3.1.0"
+version: "3.2.0"
 tools:
   - run_in_terminal
   - read_file
@@ -25,13 +29,19 @@ tools:
   - grep_search
 ---
 
-# Reverse Engineer a GitHub Repository
+# Reverse Engineer a Repository (Remote or Local)
 
 You are a senior software architect performing a complete reverse engineering analysis.
 **You are the AI engine.** The Python script in `scripts/` handles static analysis;
 you provide AI-quality narrative, architectural judgment, and domain explanation.
 
 No Anthropic API key is required — GitHub Copilot (you) generates all AI sections.
+
+This skill works on two kinds of input, handled identically from Step 3 onward:
+- **A GitHub URL** — the repo is shallow-cloned to a temp dir, analyzed, then the clone is deleted.
+- **A local folder path** (including "this project" / "the current folder" / a path you already
+  have open in the workspace) — analyzed **in place**, nothing is cloned, nothing of the user's
+  is ever deleted.
 
 The final report has **four sections only**:
 1. System Design Overview
@@ -43,11 +53,19 @@ The final report has **four sections only**:
 
 ## Step 1 — Validate Input
 
-The user provides a GitHub repository URL.
-Expected format: `https://github.com/owner/repo`
+Figure out what the user wants analyzed — either:
+- **A GitHub repository URL**, expected format `https://github.com/owner/repo`, or
+- **A local folder** — an explicit path (`C:\Projects\LegacyApp`, `./my-app`), or an implicit
+  reference to the project/workspace already open (e.g. "reverse engineer this project",
+  "analyze this codebase", "document this folder"). For an implicit reference, resolve it to
+  the current workspace root folder path.
 
-If the URL is missing or malformed, ask:
-> **"Please provide a full GitHub repository URL (e.g. https://github.com/django/django)."**
+If neither a URL nor a resolvable local path is present, ask:
+> **"Please provide a GitHub repository URL (e.g. https://github.com/django/django), or tell me which local folder to analyze (e.g. this project, or a path like C:\Projects\LegacyApp)."**
+
+If the user names a local path, **verify it exists** before proceeding
+(`file_search` or `run_in_terminal` with a directory check). If it does not exist, say so and
+ask for a corrected path — do not guess.
 
 ---
 
@@ -56,11 +74,18 @@ If the URL is missing or malformed, ask:
 Before running the analysis, ask:
 
 > **"Where should I save the output files?**
-> 1. A folder named after the repo in the current directory — e.g. `./nopCommerce/` _(recommended)_
+> 1. A folder named after the repo/project in the current directory — e.g. `./nopCommerce/` _(recommended)_
 > 2. Directly in the current directory — files land next to your code
 > 3. A specific path — type it (e.g. `C:\Reports` or `~/analysis`)"
 
 If the user does not answer or presses Enter, default to **option 1**.
+
+**Local-folder special case:** if the target being analyzed *is* the current directory (e.g.
+the user said "analyze this project" while sitting in it), option 1 would create the output
+subfolder nested inside the very project being analyzed. That's harmless (generated `.md` /
+`.json` / `.html` / `.svg` files aren't source code, so a re-run won't re-analyze them) but can
+be confusing — mention this and suggest option 3 with a sibling path (e.g. `../{project}-analysis`)
+if the user wants a cleaner separation.
 
 Map the answer to a `--output` flag:
 - Option 1 / no answer → omit `--output` (script creates `./{repo_name}/`)
@@ -81,17 +106,37 @@ The analysis script is bundled with this skill at:
 python --version
 ```
 
-**Run the engine** (substitute `<URL>` and the output flag from Step 2):
+**Run the engine** (substitute `<TARGET>` — either the GitHub URL or the local folder path —
+and the output flag from Step 2). The script auto-detects which kind of target it is: strings
+starting with `http(s)://`, `git://`, or `user@host:` are treated as remote URLs and cloned;
+anything else that resolves to an existing directory is analyzed in place.
+
 ```bash
 # Option 1 — default subfolder
-python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py <URL> --heuristic
+python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py <TARGET> --heuristic
 
 # Option 2 — current directory
-python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py <URL> --heuristic --output .
+python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py <TARGET> --heuristic --output .
 
 # Option 3 — custom path
-python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py <URL> --heuristic --output <PATH>
+python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py <TARGET> --heuristic --output <PATH>
 ```
+
+Examples:
+```bash
+# Remote
+python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py https://github.com/django/django --heuristic
+
+# Local — explicit path
+python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py C:\Projects\LegacyApp --heuristic
+
+# Local — the workspace/project already open
+python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py . --heuristic --output ..\legacyapp-analysis
+```
+
+If `<TARGET>` is neither a valid URL nor an existing directory, the script exits with a clear
+`Error: '<TARGET>' is neither a git URL ... nor an existing local directory.` — relay that to
+the user and ask for a corrected value rather than retrying blindly.
 
 Wait for completion. Output files produced:
 
@@ -273,7 +318,7 @@ Print confirmation:
 
 ```
 Reverse engineering complete ✓
-Repository : {repo_url}
+Source     : {repo_url or local folder path}
 Report     : {report_path}
 
 Sections generated:
@@ -302,9 +347,9 @@ Other output files in {output_dir}:
 
 If `python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py` is missing:
 
-```bash
-git clone --depth=1 <URL> ./temp_analysis_repo
-```
+- **Remote target:** `git clone --depth=1 <URL> ./temp_analysis_repo`, then analyze that folder.
+- **Local target:** skip cloning entirely — read files directly from the folder the user
+  pointed you at. Never delete or move anything in that folder.
 
 Discover files: `.py .java .cs .ts .tsx .js .jsx .aspx .aspx.cs .cshtml .html .vue`
 Skip: `node_modules/ bin/ obj/ .git/ dist/ build/ migrations/ __pycache__/`
@@ -325,6 +370,9 @@ Then continue with Steps 5–8.
 ## Notes
 
 - **No API key required** — GitHub Copilot is the AI engine
+- **Remote or local, same pipeline** — a GitHub URL is shallow-cloned to a temp dir and the
+  clone is deleted after analysis; a local folder is analyzed **in place** and is never
+  cloned, moved, or deleted — only read
 - **Output location** — files go to the user's chosen directory (Step 2), not a hidden `outputs/` folder
 - **Script path** — always reference as `.github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py`
 - **ASPX support** — `.aspx` and `.aspx.cs` are Web Forms screens; detected automatically

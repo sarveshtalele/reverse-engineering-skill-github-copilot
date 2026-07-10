@@ -95,6 +95,19 @@ def generate_html_dashboard(
     Returns:
         str: A complete, self-contained HTML document as a string.
     """
+    _is_web_url = repo_url.startswith(("http://", "https://"))
+    if _is_web_url:
+        _repo_label = "Repository"
+        _repo_link_html = (
+            f'<a href="{repo_url}" target="_blank" rel="noopener" '
+            f'style="font-size:12px;color:var(--blue);text-decoration:none;word-break:break-all" '
+            f'onmouseover="this.style.textDecoration=\'underline\'" '
+            f'onmouseout="this.style.textDecoration=\'none\'">{repo_url}</a>'
+        )
+    else:
+        _repo_label = "Source (local)"
+        _repo_link_html = f'<span class="stat-val" style="font-size:12px;word-break:break-all">{repo_url}</span>'
+
     if arch_layers is None:
         arch_layers = []
     if db_schema is None:
@@ -1077,11 +1090,8 @@ body {{
             <span class="stat-val">{platform}</span>
           </div>
           <div class="stat-row">
-            <span class="stat-label">Repository</span>
-            <a href="{repo_url}" target="_blank" rel="noopener"
-               style="font-size:12px;color:var(--blue);text-decoration:none;word-break:break-all"
-               onmouseover="this.style.textDecoration='underline'"
-               onmouseout="this.style.textDecoration='none'">{repo_url}</a>
+            <span class="stat-label">{_repo_label}</span>
+            {_repo_link_html}
           </div>
         </div>
       </div>

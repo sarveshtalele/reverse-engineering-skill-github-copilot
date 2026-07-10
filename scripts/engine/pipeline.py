@@ -96,8 +96,8 @@ def clone_repo(url, target_dir):
 def repo_name_from_url(url):
     """Extract a sanitised repository name from a GitHub URL.
 
-    Strips trailing slashes and ``.git`` suffixes, takes the final path
-    segment, then replaces any character that is not alphanumeric, a
+    Strips a trailing slash and a trailing ``.git`` suffix, takes the final
+    path segment, then replaces any character that is not alphanumeric, a
     hyphen, or an underscore with ``_``.
 
     Args:
@@ -106,19 +106,61 @@ def repo_name_from_url(url):
     Returns:
         str: A filesystem-safe repository name (e.g. ``"nopCommerce"``).
     """
-    name = url.rstrip("/").rstrip(".git").split("/")[-1]
+    name = url.rstrip("/")
+    if name.endswith(".git"):
+        name = name[: -len(".git")]
+    name = name.split("/")[-1]
+    return re.sub(r'[^\w\-]', '_', name)
+
+
+def is_git_url(value):
+    """Return ``True`` if *value* looks like a remote git/GitHub URL.
+
+    Args:
+        value (str): Candidate repository locator supplied by the user.
+
+    Returns:
+        bool: ``True`` for ``https://``, ``http://``, ``git://`` and
+        ``git@host:owner/repo.git`` style locators; ``False`` otherwise
+        (e.g. local filesystem paths).
+    """
+    value = value.strip()
+    return (
+        value.startswith("https://")
+        or value.startswith("http://")
+        or value.startswith("git://")
+        or bool(re.match(r'^[\w.\-]+@[\w.\-]+:', value))
+    )
+
+
+def repo_name_from_path(path):
+    """Derive a filesystem-safe repository name from a local directory path.
+
+    Args:
+        path (str): Absolute or relative path to a local project directory.
+
+    Returns:
+        str: A filesystem-safe name derived from the final path segment
+        (e.g. ``"my-project"`` for ``C:\\work\\my-project``).
+    """
+    name = os.path.basename(os.path.normpath(os.path.abspath(path)))
+    name = name or "local_project"
     return re.sub(r'[^\w\-]', '_', name)
 
 
 def run_pipeline(repo_url, mode="heuristic", output_dir=None):
     """Execute the full reverse engineering pipeline for *repo_url*.
 
-    Clones the repository, analyses the source code, generates five output
-    files (SDD JSON, HTML dashboard, Markdown report, quality evaluation,
-    manifest), and prints a concise progress summary to stdout.
+    *repo_url* may be either a remote git/GitHub URL (which is shallow-cloned
+    to a temp directory) or a path to a project that already exists on the
+    local filesystem (which is analysed in place, no clone, no cleanup of
+    user files). Either way this analyses the source code, generates five
+    output files (SDD JSON, HTML dashboard, Markdown report, quality
+    evaluation, manifest), and prints a concise progress summary to stdout.
 
     Args:
-        repo_url (str): GitHub repository URL to analyse.
+        repo_url (str): GitHub repository URL, or a path to an existing
+            local directory to analyse in place.
         mode (str): ``"heuristic"`` (default) or ``"ai"`` (requires
             ``ANTHROPIC_API_KEY`` env var and the ``anthropic`` Python SDK).
         output_dir (str | None): Directory to write output files into.
@@ -129,25 +171,47 @@ def run_pipeline(repo_url, mode="heuristic", output_dir=None):
     Returns:
         None
 
+    Raises:
+        ValueError: If *repo_url* is neither a recognisable git URL nor an
+            existing local directory.
+
     Side effects:
         - Creates ``{output_dir}/{repo_name}/`` (or ``output_dir``) with output files.
         - Prints stage progress and final file paths to stdout.
     """
+    is_local = False
+    if is_git_url(repo_url):
+        repo_name = repo_name_from_url(repo_url)
+    elif os.path.isdir(repo_url):
+        is_local  = True
+        repo_name = repo_name_from_path(repo_url)
+    else:
+        raise ValueError(
+            f"'{repo_url}' is neither a git URL (https://github.com/owner/repo) "
+            f"nor an existing local directory. Check the URL/path and try again."
+        )
+
     print(f"\n{'='*60}")
     print(f"  Reverse Engineer Skill  (API-key-free edition)")
-    print(f"  Repository : {repo_url}")
+    print(f"  {'Local project' if is_local else 'Repository'} : {repo_url}")
     print(f"{'='*60}\n")
 
-    repo_name = repo_name_from_url(repo_url)
-    tmp_dir   = tempfile.mkdtemp(prefix="rev_eng_")
-    repo_path = os.path.join(tmp_dir, repo_name)
+    tmp_dir   = None
+    repo_path = None
 
     try:
         # ----------------------------------------------------------------
-        # 1. Clone
+        # 1. Clone (remote) or use in place (local)
         # ----------------------------------------------------------------
-        print("[1/8] Cloning repository...")
-        clone_repo(repo_url, repo_path)
+        if is_local:
+            print("[1/8] Using local project (no clone needed)...")
+            repo_path = os.path.abspath(repo_url)
+            print(f"  [ok] Analyzing in place: {repo_path}")
+        else:
+            print("[1/8] Cloning repository...")
+            tmp_dir   = tempfile.mkdtemp(prefix="rev_eng_")
+            repo_path = os.path.join(tmp_dir, repo_name)
+            clone_repo(repo_url, repo_path)
 
         # ----------------------------------------------------------------
         # 2. Load files
@@ -394,7 +458,10 @@ def run_pipeline(repo_url, mode="heuristic", output_dir=None):
         print(f"{'='*60}\n")
 
     finally:
-        try:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-        except Exception:
-            pass
+        # Only remove the temp clone directory — never touch a local project
+        # directory the user pointed us at (tmp_dir stays None in local mode).
+        if tmp_dir:
+            try:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            except Exception:
+                pass

@@ -6,17 +6,23 @@ Skill location: .github/skills/reverse-engineering-skill/scripts/
 Run via SKILL.md instruction or directly:
     python .github/skills/reverse-engineering-skill/scripts/reverse_engineer_skill.py <url>
 =====================================
-Clones any public GitHub repository and generates five professional output
-files via **pure static analysis** — no API keys, no LLM accounts, no
-internet access beyond git clone.
+Analyzes any public GitHub repository OR an existing project already on your
+local disk, and generates five professional output files via **pure static
+analysis** — no API keys, no LLM accounts, no internet access beyond git
+clone (and no internet at all for local projects).
 
 Usage:
-    python reverse_engineer_skill.py <github-repo-url> [--help]
+    python reverse_engineer_skill.py <github-repo-url | local-folder-path> [--help]
 
-Examples:
+Examples (remote — shallow-cloned to a temp dir, analyzed, then deleted):
     python reverse_engineer_skill.py https://github.com/nopSolutions/nopCommerce
     python reverse_engineer_skill.py https://github.com/spring-projects/spring-petclinic
     python reverse_engineer_skill.py https://github.com/django/django
+
+Examples (local — analyzed in place, nothing cloned or deleted):
+    python reverse_engineer_skill.py C:/Projects/my-legacy-app
+    python reverse_engineer_skill.py ./my-project
+    python reverse_engineer_skill.py .
 
 Output files (in ./{repo_name}/ by default, or --output <dir>):
     {repo_name}_sdd.json        — System Design Document (JSON, all sections)
@@ -134,11 +140,11 @@ def main() -> None:
         print(_HELP)
         sys.exit(0 if args else 1)
 
-    # Extract URL (first positional arg — ignore flag arguments)
+    # Extract URL or local path (first positional arg — ignore flag arguments)
     repo_url = next((a for a in args if not a.startswith("--")), None)
     if not repo_url:
-        print("Error: No GitHub URL provided.\n")
-        print("Usage: python reverse_engineer_skill.py <github-repo-url>")
+        print("Error: No GitHub URL or local folder path provided.\n")
+        print("Usage: python reverse_engineer_skill.py <github-repo-url | local-folder-path>")
         sys.exit(1)
 
     mode = _ask_mode(args)
@@ -153,7 +159,14 @@ def main() -> None:
             output_dir = a.split("=", 1)[1]
             break
 
-    run_pipeline(repo_url, mode=mode, output_dir=output_dir)
+    try:
+        run_pipeline(repo_url, mode=mode, output_dir=output_dir)
+    except ValueError as e:
+        print(f"\nError: {e}\n")
+        sys.exit(1)
+    except RuntimeError as e:
+        print(f"\nError: {e}\n")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
